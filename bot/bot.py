@@ -17,13 +17,13 @@ from telegram.ext import (
 )
 from telegram.constants import ParseMode, ChatAction
 
-import config
+from bot import config
 import database
 import chatgpt
 
 
 # setup
-db = database.Database()
+db = database.Database(config.mongodb_uri)
 logger = logging.getLogger(__name__)
 
 HELP_MESSAGE = """Commands:

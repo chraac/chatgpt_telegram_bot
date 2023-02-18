@@ -4,26 +4,10 @@ import pymongo
 import uuid
 from datetime import datetime
 
-import config
-
-
-class DBBase:
-    def __init__(self):
-        pass
-
-    def create_table_with_columns(self, table_name, columns):
-        pass
-
-    def table_insert(self, table_name, item_dict):
-        pass
-
-    def table_query_one(self, table_name, item_dict):
-        pass
-
 
 class Database:
-    def __init__(self):
-        self.client = pymongo.MongoClient(config.mongodb_uri)
+    def __init__(self, mongodb_uri):
+        self.client = pymongo.MongoClient(mongodb_uri)
         self.db = self.client["chatgpt_telegram_bot"]
 
         self.user_collection = self.db["user"]
