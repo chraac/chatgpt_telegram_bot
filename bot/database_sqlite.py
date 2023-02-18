@@ -4,6 +4,38 @@ from contextlib import closing
 from datetime import datetime
 from typing import Any, Optional
 
+_TABLE_TYPE_CONVERTOR = {
+    datetime: (
+        lambda x: str(x.timestamp()),
+        lambda x: datetime.fromtimestamp(x),
+    ),
+    str: (
+        lambda x: f"'{x}'",
+        lambda x: x,
+    ),
+    int: (
+        lambda x: str(x),
+        lambda x: x,
+    ),
+    float: (
+        lambda x: str(x),
+        lambda x: x,
+    ),
+}
+
+_USER_TABLE_FIELD_TYPES = {
+    "_id": int,
+    "chat_id": int,
+    "username": str,
+    "first_name": str,
+    "last_name": str,
+    "last_interaction": datetime,
+    "first_seen": datetime,
+    "current_dialog_id": str,
+    "current_chat_mode": str,
+    "n_used_tokens": int,
+}
+
 
 class SqliteDataBase:
 
@@ -55,7 +87,7 @@ class SqliteDataBase:
             last_name: str = "",
     ):
         if not self.check_if_user_exists(user_id):
-            time_now = datetime.now().timestamp()
+            time_now = datetime.now()
             self.__insert_table_row("users", [
                 user_id,  # _id
                 chat_id,  # chat_id
@@ -79,7 +111,7 @@ class SqliteDataBase:
             dialog_id,  # _id
             user_id,  # user_id
             self.get_user_attribute(user_id, "current_chat_mode"),  # chat_mode
-            datetime.now().timestamp(),  # start_time
+            datetime.now(),  # start_time
         ])
 
         # update user's current dialog
@@ -95,7 +127,7 @@ class SqliteDataBase:
             res = cursor.execute(f"SELECT {key} FROM users WHERE _id='{user_id}' LIMIT 1").fetchone()
             if res is None or len(res) == 0:
                 raise ValueError(f"User {user_id} does not have a value for {key}")
-            return res[0]
+            return SqliteDataBase.__from_string_value(res[0], _USER_TABLE_FIELD_TYPES[key])
 
     def set_user_attribute(self, user_id: int, key: str, value: Any):
         self.check_if_user_exists(user_id, raise_exception=True)
@@ -109,7 +141,7 @@ class SqliteDataBase:
                                  f"WHERE dialog_id={dialog_id} AND user_id={user_id} "
                                  f"ORDER BY _date")
             return map(
-                lambda item: {"user": item[0], "bot": item[1], "date": datetime.fromtimestamp(int(item[2]))},
+                lambda item: {"user": item[0], "bot": item[1], "date": datetime.fromtimestamp(item[2])},
                 res
             )
 
@@ -117,7 +149,7 @@ class SqliteDataBase:
         self.check_if_user_exists(user_id, raise_exception=True)
         dialog_id = dialog_id or self.get_user_attribute(user_id, "current_dialog_id")
         self.__insert_table_row("messages", [
-            new_dialog_message["date"].timestamp(),  # _date
+            new_dialog_message["date"],  # _date
             user_id,
             dialog_id,
             new_dialog_message["user"],  # user
@@ -138,12 +170,7 @@ class SqliteDataBase:
         for d in datas:
             if should_add_comma:
                 sql_str += ","
-            if isinstance(d, str):
-                sql_str += f"'{d}'"
-            elif d is None:
-                sql_str += "null"
-            else:
-                sql_str += str(d)
+            sql_str += SqliteDataBase.__to_string_value(d)
             should_add_comma = True
         sql_str += ")"
         with closing(self.db_conn.cursor()) as cursor:
@@ -153,13 +180,7 @@ class SqliteDataBase:
     def __update_table_row(self, table_name: str, where: tuple, datas: dict):
         sql_str = f"UPDATE {table_name} SET "
         for k, v in datas.items():
-            if isinstance(v, datetime):
-                v = v.timestamp()
-            elif isinstance(v, str):
-                v = f"'{v}'"
-            else:
-                v = str(v)
-            sql_str += f"{str(k)}={v}, "
+            sql_str += f"{str(k)}={SqliteDataBase.__to_string_value(v)}, "
         sql_str = f"{sql_str[0:-2]} WHERE {str(where[0])} = {str(where[1])}"
         with closing(self.db_conn.cursor()) as cursor:
             cursor.execute(sql_str)
@@ -171,3 +192,20 @@ class SqliteDataBase:
                 .execute(f"SELECT {key} FROM {table_name} WHERE {str(where[0])}={str(where[1])} LIMIT 1") \
                 .fetchone()
             return res[0] if res is not None and len(res) > 0 else None
+
+    @staticmethod
+    def __to_string_value(value: str):
+        if value is None:
+            return "null"
+        elif type(value) in _TABLE_TYPE_CONVERTOR:
+            return _TABLE_TYPE_CONVERTOR[type(value)][0](value)
+        return str(value)
+
+    @staticmethod
+    def __from_string_value(value: str, output_type: type):
+        if value is None or value == "null":
+            return None
+        elif output_type in _TABLE_TYPE_CONVERTOR:
+            return _TABLE_TYPE_CONVERTOR[output_type][1](value)
+        else:
+            return value
