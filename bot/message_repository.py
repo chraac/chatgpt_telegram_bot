@@ -1,29 +1,11 @@
-from typing import Optional, Any
-
-import pymongo
 import uuid
 from datetime import datetime
 
-import config
 
+class MessageRepository:
 
-class DBBase:
-    def __init__(self):
-        pass
-
-    def create_table(self, table_name):
-        pass
-
-    def ;
-
-
-class Database:
-    def __init__(self):
-        self.client = pymongo.MongoClient(config.mongodb_uri)
-        self.db = self.client["chatgpt_telegram_bot"]
-
-        self.user_collection = self.db["user"]
-        self.dialog_collection = self.db["dialog"]
+    def __init__(self, db):
+        self.db_instance = db
 
     def check_if_user_exists(self, user_id: int, raise_exception: bool = False):
         if self.user_collection.count_documents({"_id": user_id}) > 0:
@@ -35,12 +17,12 @@ class Database:
                 return False
 
     def add_new_user(
-            self,
-            user_id: int,
-            chat_id: int,
-            username: str = "",
-            first_name: str = "",
-            last_name: str = "",
+        self,
+        user_id: int,
+        chat_id: int,
+        username: str = "",
+        first_name: str = "",
+        last_name: str = "",
     ):
         user_dict = {
             "_id": user_id,
@@ -119,3 +101,4 @@ class Database:
             {"_id": dialog_id, "user_id": user_id},
             {"$set": {"messages": dialog_messages}}
         )
+
