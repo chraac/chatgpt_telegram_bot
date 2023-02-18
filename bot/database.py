@@ -11,10 +11,14 @@ class DBBase:
     def __init__(self):
         pass
 
-    def create_table(self, table_name):
+    def create_table_with_columns(self, table_name, columns):
         pass
 
-    def ;
+    def table_insert(self, table_name, item_dict):
+        pass
+
+    def table_query_one(self, table_name, item_dict):
+        pass
 
 
 class Database:
