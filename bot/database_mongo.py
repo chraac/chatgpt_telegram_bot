@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 
 
-class Database:
+class MongoDataBase:
     def __init__(self, mongodb_uri):
         self.client = pymongo.MongoClient(mongodb_uri)
         self.db = self.client["chatgpt_telegram_bot"]
@@ -101,7 +101,7 @@ class Database:
         new_messages = self.get_dialog_messages(user_id, dialog_id=None) + [new_dialog_message]
         self.__set_dialog_messages(user_id, new_messages, dialog_id)
 
-    def remove_dialog_last_message(self, user_id, dialog_id: Optional[str] = None):
+    def remove_dialog_last_message(self, user_id: int, dialog_id: Optional[str] = None):
         dialog_messages = self.get_dialog_messages(user_id, dialog_id)
         if len(dialog_messages) == 0:
             return None

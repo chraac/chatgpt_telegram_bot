@@ -38,7 +38,7 @@ class SqliteDataBase:
     ):
         if not self.check_if_user_exists(user_id):
             time_now = datetime.now().timestamp()
-            self.__insert_into_table("users", [
+            self.__insert_table_row("users", [
                 user_id,  # _id
                 chat_id,  # chat_id
                 username,  # username
@@ -57,7 +57,7 @@ class SqliteDataBase:
         dialog_id = str(uuid.uuid4())
 
         # add new dialog
-        self.__insert_into_table("dialogs", [
+        self.__insert_table_row("dialogs", [
             dialog_id,  # _id
             user_id,  # user_id
             self.get_user_attribute(user_id, "current_chat_mode"),  # chat_mode
@@ -86,21 +86,27 @@ class SqliteDataBase:
     def get_dialog_messages(self, user_id: int, dialog_id: Optional[str] = None):
         self.check_if_user_exists(user_id, raise_exception=True)
         dialog_id = dialog_id or self.get_user_attribute(user_id, "current_dialog_id")
-        dialog_dict = self.dialog_collection.find_one({"_id": dialog_id, "user_id": user_id})
-        return dialog_dict["messages"]
+        with closing(self.db_conn.cursor()) as cursor:
+            res = cursor.execute(f"SELECT user,bot,_date FROM messages "
+                                 f"WHERE dialog_id={dialog_id} AND user_id={user_id} "
+                                 f"ORDER BY _date")
+            return map(
+                lambda item: {"user": item[0], "bot": item[1], "date": datetime.fromtimestamp(int(item[2]))},
+                res
+            )
 
     def append_dialog_message(self, user_id: int, new_dialog_message: dict, dialog_id: Optional[str] = None):
         self.check_if_user_exists(user_id, raise_exception=True)
+        dialog_id = dialog_id or self.get_user_attribute(user_id, "current_dialog_id")
+        self.__insert_table_row("messages", [
+            str(new_dialog_message["date"].timestamp()),  # _date
+            str(user_id),
+            str(dialog_id),
+            new_dialog_message["user"],  # user
+            new_dialog_message["bot"],  # bot
+        ])
 
-        if dialog_id is None:
-            dialog_id = self.get_user_attribute(user_id, "current_dialog_id")
-
-        self.dialog_collection.update_one(
-            {"_id": dialog_id, "user_id": user_id},
-            {"$set": {"messages": dialog_messages}}
-        )
-
-    def remove_dialog_last_message(self, user_id, dialog_id: Optional[str] = None):
+    def remove_dialog_last_message(self, user_id: int, dialog_id: Optional[str] = None):
         dialog_id = dialog_id or self.get_user_attribute(user_id, "current_dialog_id")
         with closing(self.db_conn.cursor()) as cursor:
             cursor.execute(f"DELETE FROM messages "
@@ -108,7 +114,7 @@ class SqliteDataBase:
                            f"AND dialog_id={str(dialog_id)}")
             self.db_conn.commit()
 
-    def __insert_into_table(self, table_name: str, datas: list):
+    def __insert_table_row(self, table_name: str, datas: list):
         sql_str = f"INSERT INTO {table_name} VALUES("
         should_add_comma = False
         for d in enumerate(datas):
@@ -132,7 +138,7 @@ class SqliteDataBase:
 
     def __get_table_attribute(self, table_name: str, where: tuple, key: str):
         with closing(self.db_conn.cursor()) as cursor:
-            res = cursor\
-                .execute(f"SELECT {key} FROM {table_name} WHERE {str(where[0])} = {str(where[1])} LIMIT 1")\
+            res = cursor \
+                .execute(f"SELECT {key} FROM {table_name} WHERE {str(where[0])}={str(where[1])} LIMIT 1") \
                 .fetchone()
             return res[0] if res is not None and len(res) > 0 else None
