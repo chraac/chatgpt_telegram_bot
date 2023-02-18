@@ -1,11 +1,11 @@
 import argparse
-import os
 import logging
 import traceback
 import html
 import json
 from datetime import datetime
 
+import openai
 import telegram
 from telegram import Update, User, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -227,7 +227,9 @@ def run_bot() -> None:
     global db
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--database", type=str)
+    parser.add_argument("-p", "--proxy", type=str)
     curr_args = parser.parse_args()
+    openai.proxy = curr_args.proxy
     if curr_args.database == "sqlite":
         db = database_sqlite.SqliteDataBase(config.sqlite_database_uri)
     else:
