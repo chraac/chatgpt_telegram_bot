@@ -136,14 +136,15 @@ class SqliteDataBase:
     def get_dialog_messages(self, user_id: int, dialog_id: Optional[str] = None):
         self.check_if_user_exists(user_id, raise_exception=True)
         dialog_id = dialog_id or self.get_user_attribute(user_id, "current_dialog_id")
+        dialog_id = SqliteDataBase.__to_string_value(dialog_id)
         with closing(self.db_conn.cursor()) as cursor:
             res = cursor.execute(f"SELECT user,bot,_date FROM messages "
                                  f"WHERE dialog_id={dialog_id} AND user_id={user_id} "
                                  f"ORDER BY _date")
-            return map(
+            return list(map(
                 lambda item: {"user": item[0], "bot": item[1], "date": datetime.fromtimestamp(item[2])},
                 res
-            )
+            ))
 
     def append_dialog_message(self, user_id: int, new_dialog_message: dict, dialog_id: Optional[str] = None):
         self.check_if_user_exists(user_id, raise_exception=True)
@@ -158,6 +159,7 @@ class SqliteDataBase:
 
     def remove_dialog_last_message(self, user_id: int, dialog_id: Optional[str] = None):
         dialog_id = dialog_id or self.get_user_attribute(user_id, "current_dialog_id")
+        dialog_id = SqliteDataBase.__to_string_value(dialog_id)
         with closing(self.db_conn.cursor()) as cursor:
             cursor.execute(f"DELETE FROM messages "
                            f"WHERE _date=(SELECT MAX(_date) FROM messages WHERE dialog_id={str(dialog_id)} LIMIT 1) "
