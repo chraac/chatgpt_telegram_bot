@@ -8,12 +8,30 @@ from typing import Any, Optional
 class SqliteDataBase:
 
     def __init__(self, sqlite_uri: str):
-        self.db_conn = sqlite3.connect("chatgpt_telegram_bot")
+        self.db_conn = sqlite3.connect(sqlite_uri)
         with closing(self.db_conn.cursor()) as cursor:
-            cursor.execute("CREATE TABLE users(_id, chat_id, username, first_name, last_name, last_interaction, "
-                           "first_seen, current_dialog_id, current_chat_mode, n_used_tokens)")
-            cursor.execute("CREATE TABLE dialogs(_id, user_id, chat_mode, start_time)")
-            cursor.execute("CREATE TABLE messages(_date, user_id, dialog_id, user, bot)")
+            cursor.execute("CREATE TABLE IF NOT EXISTS users("
+                           "_id INT PRIMARY KEY NOT NULL, "
+                           "chat_id INT NOT NULL, "
+                           "username TEXT, "
+                           "first_name TEXT, "
+                           "last_name TEXT, "
+                           "last_interaction INT NOT NULL, "
+                           "first_seen INT NOT NULL, "
+                           "current_dialog_id TEXT, "
+                           "current_chat_mode TEXT NOT NULL, "
+                           "n_used_tokens INT NOT NULL)")
+            cursor.execute("CREATE TABLE IF NOT EXISTS dialogs("
+                           "_id TEXT PRIMARY KEY NOT NULL, "
+                           "user_id INT NOT NULL, "
+                           "chat_mode INT NOT NULL, "
+                           "start_time INT NOT NULL)")
+            cursor.execute("CREATE TABLE IF NOT EXISTS messages("
+                           "_date INT PRIMARY KEY NOT NULL, "
+                           "user_id INT NOT NULL, "
+                           "dialog_id TEXT NOT NULL, "
+                           "user TEXT, "
+                           "bot TEXT)")
             self.db_conn.commit()
 
     def close(self):
@@ -99,9 +117,9 @@ class SqliteDataBase:
         self.check_if_user_exists(user_id, raise_exception=True)
         dialog_id = dialog_id or self.get_user_attribute(user_id, "current_dialog_id")
         self.__insert_table_row("messages", [
-            str(new_dialog_message["date"].timestamp()),  # _date
-            str(user_id),
-            str(dialog_id),
+            new_dialog_message["date"].timestamp(),  # _date
+            user_id,
+            dialog_id,
             new_dialog_message["user"],  # user
             new_dialog_message["bot"],  # bot
         ])
@@ -117,10 +135,15 @@ class SqliteDataBase:
     def __insert_table_row(self, table_name: str, datas: list):
         sql_str = f"INSERT INTO {table_name} VALUES("
         should_add_comma = False
-        for d in enumerate(datas):
+        for d in datas:
             if should_add_comma:
                 sql_str += ","
-            sql_str += str(d)
+            if isinstance(d, str):
+                sql_str += f"'{d}'"
+            elif d is None:
+                sql_str += "null"
+            else:
+                sql_str += str(d)
             should_add_comma = True
         sql_str += ")"
         with closing(self.db_conn.cursor()) as cursor:
@@ -130,8 +153,14 @@ class SqliteDataBase:
     def __update_table_row(self, table_name: str, where: tuple, datas: dict):
         sql_str = f"UPDATE {table_name} SET "
         for k, v in datas.items():
-            sql_str += f"{str(k)}={str(v)}, "
-        sql_str += f"WHERE {str(where[0])} = {str(where[1])}"
+            if isinstance(v, datetime):
+                v = v.timestamp()
+            elif isinstance(v, str):
+                v = f"'{v}'"
+            else:
+                v = str(v)
+            sql_str += f"{str(k)}={v}, "
+        sql_str = f"{sql_str[0:-2]} WHERE {str(where[0])} = {str(where[1])}"
         with closing(self.db_conn.cursor()) as cursor:
             cursor.execute(sql_str)
             self.db_conn.commit()

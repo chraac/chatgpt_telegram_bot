@@ -1,3 +1,4 @@
+import argparse
 import os
 import logging
 import traceback
@@ -17,12 +18,13 @@ from telegram.ext import (
 )
 from telegram.constants import ParseMode, ChatAction
 
-from bot import config
+import config
+import database_sqlite
 import database_mongo
 import chatgpt
 
 # setup
-db = database.MongoDataBase(config.mongodb_uri)
+db = None
 logger = logging.getLogger(__name__)
 
 HELP_MESSAGE = """Commands:
@@ -222,6 +224,15 @@ async def error_handle(update: Update, context: CallbackContext) -> None:
 
 
 def run_bot() -> None:
+    global db
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--database", type=str)
+    curr_args = parser.parse_args()
+    if curr_args.database == "sqlite":
+        db = database_sqlite.SqliteDataBase(config.sqlite_database_uri)
+    else:
+        db = database_mongo.MongoDataBase(config.mongodb_uri)
+
     application = (
         ApplicationBuilder()
         .token(config.telegram_token)
