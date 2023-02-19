@@ -1,3 +1,4 @@
+import argparse
 import os
 import logging
 import traceback
@@ -8,6 +9,7 @@ import pydub
 from pathlib import Path
 from datetime import datetime
 
+import openai
 import telegram
 from telegram import Update, User, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -21,12 +23,13 @@ from telegram.ext import (
 from telegram.constants import ParseMode, ChatAction
 
 import config
+import database_sqlite
+import database_mongo
+import chatgpt
 import database
-import openai_utils
-
 
 # setup
-db = database.Database()
+db = None
 logger = logging.getLogger(__name__)
 
 HELP_MESSAGE = """Commands:
@@ -50,7 +53,7 @@ async def register_user_if_not_exists(update: Update, context: CallbackContext, 
             update.message.chat_id,
             username=user.username,
             first_name=user.first_name,
-            last_name= user.last_name
+            last_name=user.last_name
         )
         db.start_new_dialog(user.id)
 
@@ -61,15 +64,15 @@ async def register_user_if_not_exists(update: Update, context: CallbackContext, 
 async def start_handle(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update, context, update.message.from_user)
     user_id = update.message.from_user.id
-    
+
     db.set_user_attribute(user_id, "last_interaction", datetime.now())
     db.start_new_dialog(user_id)
-    
+
     reply_text = "Hi! I'm <b>ChatGPT</b> bot implemented with GPT-3.5 OpenAI API 🤖\n\n"
     reply_text += HELP_MESSAGE
 
     reply_text += "\nAnd now... ask me anything!"
-    
+
     await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML)
 
 
@@ -85,13 +88,10 @@ async def retry_handle(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
     db.set_user_attribute(user_id, "last_interaction", datetime.now())
 
-    dialog_messages = db.get_dialog_messages(user_id, dialog_id=None)
-    if len(dialog_messages) == 0:
+    last_dialog_message = db.remove_dialog_last_message(user_id)
+    if last_dialog_message is None:
         await update.message.reply_text("No message to retry 🤷‍♂️")
         return
-
-    last_dialog_message = dialog_messages.pop()
-    db.set_dialog_messages(user_id, dialog_messages, dialog_id=None)  # last message was removed from the context
 
     await message_handle(update, context, message=last_dialog_message["user"], use_new_dialog_timeout=False)
 
@@ -101,7 +101,7 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
     if update.edited_message is not None:
         await edited_message_handle(update, context)
         return
-        
+
     await register_user_if_not_exists(update, context, update.message.from_user)
     user_id = update.message.from_user.id
     chat_mode = db.get_user_attribute(user_id, "current_chat_mode")
@@ -131,14 +131,8 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
 
         # update user data
         new_dialog_message = {"user": message, "bot": answer, "date": datetime.now()}
-        db.set_dialog_messages(
-            user_id,
-            db.get_dialog_messages(user_id, dialog_id=None) + [new_dialog_message],
-            dialog_id=None
-        )
-
+        db.append_dialog_message(user_id, new_dialog_message, dialog_id=None)
         db.set_user_attribute(user_id, "n_used_tokens", n_used_tokens + db.get_user_attribute(user_id, "n_used_tokens"))
-
     except Exception as e:
         error_text = f"Something went wrong during completion. Reason: {e}"
         logger.error(error_text)
@@ -299,11 +293,28 @@ async def error_handle(update: Update, context: CallbackContext) -> None:
     except:
         await context.bot.send_message(update.effective_chat.id, "Some error in error handler")
 
+
 def run_bot() -> None:
+    global db
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--database", type=str)
+    parser.add_argument("-p", "--proxy", type=str)
+    curr_args = parser.parse_args()
+    if curr_args.database == "sqlite":
+        db = database_sqlite.SqliteDataBase(config.sqlite_database_uri)
+    else:
+        db = database_mongo.MongoDataBase(config.mongodb_uri)
+
+    telegram_proxy = None
+    if curr_args.proxy and len(curr_args.proxy) > 0:
+        openai.proxy = curr_args.proxy
+        telegram_proxy = f"http://{curr_args.proxy}"
+
     application = (
         ApplicationBuilder()
         .token(config.telegram_token)
         .concurrent_updates(True)
+        .proxy_url(telegram_proxy)
         .build()
     )
 
@@ -326,9 +337,9 @@ def run_bot() -> None:
     application.add_handler(CallbackQueryHandler(set_chat_mode_handle, pattern="^set_chat_mode"))
 
     application.add_handler(CommandHandler("balance", show_balance_handle, filters=user_filter))
-    
+
     application.add_error_handler(error_handle)
-    
+
     # start the bot
     application.run_polling()
 

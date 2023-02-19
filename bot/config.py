@@ -18,6 +18,7 @@ use_chatgpt_api = config_yaml.get("use_chatgpt_api", True)
 allowed_telegram_usernames = config_yaml["allowed_telegram_usernames"]
 new_dialog_timeout = config_yaml["new_dialog_timeout"]
 mongodb_uri = f"mongodb://mongo:{config_env['MONGODB_PORT']}"
+sqlite_database_uri = config_env['SQLITE_DATABASE_PATH']
 
 # chat_modes
 with open(config_dir / "chat_modes.yml", 'r') as f:
