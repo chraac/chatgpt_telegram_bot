@@ -192,7 +192,7 @@ class SqliteDataBase:
         return value
 
     @staticmethod
-    def __from_query_return(value: str, output_type: type):
+    def __from_query_return(value: str, output_type: Any):
         if value is None or value == "null":
             return None
         elif output_type in _TABLE_TYPE_CONVERTOR:
