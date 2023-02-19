@@ -238,6 +238,7 @@ def run_bot() -> None:
     application = (
         ApplicationBuilder()
         .token(config.telegram_token)
+        .proxy_url(f"http://{curr_args.proxy}")
         .build()
     )
 
