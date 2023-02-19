@@ -229,16 +229,20 @@ def run_bot() -> None:
     parser.add_argument("-d", "--database", type=str)
     parser.add_argument("-p", "--proxy", type=str)
     curr_args = parser.parse_args()
-    openai.proxy = curr_args.proxy
     if curr_args.database == "sqlite":
         db = database_sqlite.SqliteDataBase(config.sqlite_database_uri)
     else:
         db = database_mongo.MongoDataBase(config.mongodb_uri)
 
+    telegram_proxy = None
+    if curr_args.proxy and len(curr_args.proxy) > 0:
+        openai.proxy = curr_args.proxy
+        telegram_proxy = f"http://{curr_args.proxy}"
+
     application = (
         ApplicationBuilder()
         .token(config.telegram_token)
-        .proxy_url(f"http://{curr_args.proxy}")
+        .proxy_url(telegram_proxy)
         .build()
     )
 
