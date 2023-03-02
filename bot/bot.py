@@ -12,6 +12,7 @@ from datetime import datetime
 import openai
 import telegram
 from telegram import Update, User, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import NetworkError
 from telegram.ext import (
     ApplicationBuilder,
     CallbackContext,
@@ -290,6 +291,8 @@ async def error_handle(update: Update, context: CallbackContext) -> None:
             except telegram.error.BadRequest:
                 # answer has invalid characters, so we send it without parse_mode
                 await context.bot.send_message(update.effective_chat.id, message_chunk)
+    except NetworkError as e:
+        print(f"NetworkError: {e}")
     except:
         await context.bot.send_message(update.effective_chat.id, "Some error in error handler")
 
