@@ -28,7 +28,6 @@ import database_sqlite
 import database_mongo
 import openai_utils
 
-
 # setup
 db = None
 logger = logging.getLogger(__name__)
@@ -41,8 +40,9 @@ HELP_MESSAGE = """Commands:
 ⚪ /help – Show help
 """
 
-DEFAULT_TIMEOUT=10
-DEFAULT_RETRY_TIMEOUT=15
+DEFAULT_TIMEOUT = 15
+DEFAULT_RETRY_TIMEOUT = 20
+
 
 def split_text_into_chunks(text, chunk_size):
     for i in range(0, len(text), chunk_size):
@@ -352,9 +352,8 @@ def run_bot() -> None:
         .token(config.telegram_token)
         .concurrent_updates(True)
         .proxy_url(telegram_proxy)
+        .get_updates_proxy_url(telegram_proxy)
         .connect_timeout(DEFAULT_TIMEOUT)
-        .read_timeout(DEFAULT_TIMEOUT)
-        .write_timeout(DEFAULT_TIMEOUT)
         .build()
     )
 
