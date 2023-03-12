@@ -55,10 +55,16 @@ mv config/config.example.yml config/config.yml
 mv config/config.example.env config/config.env
 ```
 
-🔥 And now **run**:
+🔥 And now **run** for using mongodb as database:
 
 ```bash
 docker-compose --env-file config/config.env up --build
+```
+
+Instead, using the sqlite, run:
+
+```bash
+docker-compose -f docker-compose-sqlite.yml --env-file config/config.env up --build
 ```
 
 
