@@ -16,6 +16,4 @@ RUN apk add --no-cache ffmpeg \
     && pip3 install -r requirements.txt \
     && apk del .build-deps
 
-ENTRYPOINT ["python3", "bot/bot.py"]
-
 CMD ["bash"]
